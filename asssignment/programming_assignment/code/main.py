@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 # print(python_version())
 import torch
 from torchtext.data.utils import get_tokenizer
+from torch import nn
 
 
 # Preparing dataset for training & testing
@@ -36,6 +37,8 @@ print('Length of tokens', len(all_tokens))
 # Create a vocabulary from the tokens
 vocab = set(all_tokens)
 
+print('Length of vocab',len( vocab))
+
 # Create a mapping from token to index
 word_to_index = {word: i for i, word in enumerate(vocab)}
 
@@ -46,6 +49,40 @@ for token in all_tokens:
 
 print("Bag of Words representation:")
 print(bag_of_words)
+
+class classifier(nn.Module):
+    def __init__(self,x):
+        super(self)
+        self.x = x
+
+def forward(self,x):
+    # wx+b
+        logits = self.fc(x)
+        return logits
+    
+
+def train(model, data_loader, optimizer, scheduler, device):
+    model.train()
+    for batch in data_loader:
+        optimizer.zero_grad()
+        input_ids = batch['input_ids']
+        labels = batch['label']
+        outputs = model(input_ids)
+        loss = nn.CrossEntropyLoss()(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        # scheduler.step()
+        
+        
+model = classifier(bag_of_words)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9) 
+num_epochs = 20
+for epoch in range(num_epochs):
+    print(f"Epoch {epoch + 1}/{num_epochs}")
+    train(model, training_dataset, optimizer,)
+    # accuracy, report = evaluate(model, val_dataloader, device)
+    # print(f"Validation Accuracy: {accuracy:.4f}")
+    # print(report)
 
 
     
