@@ -85,16 +85,25 @@ class feature_extractor:
         # x = np.zeros((self.d))
         x = csc_matrix((self.d, 1), dtype=np.int8)
         x = x.tolil()
-        for unique_word in self.vocab_dict:
-            if unique_word in sentence:
-                # print(x[self.vocab_dict[unique_word],0],'fdkfjdfjk')
-                # this below if was i was trying to increase the count in the same sentence repeated words
-                if x[self.vocab_dict[unique_word],0] and x[self.vocab_dict[unique_word],0] == 1:
-                    x[self.vocab_dict[unique_word],0] += 1
-                else:  
-                    x[self.vocab_dict[unique_word],0] = 1
+        tokenize_one_review = tokenize(sentence)
+        for word in tokenize_one_review:
+            if word in self.vocab_dict:
+                x[self.vocab_dict[word],0] = Counter([sentence])[word]
+                
+            
+        
+        
+
                     
-        # print(x.shape, 'dfjhdafhakj', x.tocsr().max(), x)
+        # for unique_word in self.vocab_dict:
+        #     if unique_word in sentence:
+        #         # print(x[self.vocab_dict[unique_word],0],'fdkfjdfjk')
+        #         # this below if was i was trying to increase the count in the same sentence repeated words
+        #         if x[self.vocab_dict[unique_word],0] and x[self.vocab_dict[unique_word],0] == 1:
+        #             x[self.vocab_dict[unique_word],0] += 1
+        #         else:  
+        #             x[self.vocab_dict[unique_word],0] = 1
+                    
         return x.tocsr()
 
 
@@ -158,8 +167,13 @@ class classifier_agent():
         (d,m) = X.shape
         s = np.zeros(shape=m) # this is the desired type and shape for the output
         # TODO ======================== YOUR CODE HERE =====================================
-        exponents = np.exp(np.dot(self.params.T,X))
-        s = exponents / (1 + exponents)
+        # exponents = np.exp(np.dot(self.params.T,X))
+        # s = exponents / (1 + exponents)
+        # print(self.params.shape, X.shape, 'score function')
+        s = self.params * X
+        # s = 1/np.exp(-s)
+        s = np.exp(s)/(1+np.exp(-s))
+        
         print('end score')
 
         # TODO =============================================================================
@@ -181,7 +195,7 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # This should be a simple but useful function.
         preds = np.zeros(shape=X.shape[1])
-        preds = np.dot(self.params.T, X)
+        preds = self.params * X
         preds = 1/(1 + np.exp(-preds)) 
         
         # TODO =============================================================================
@@ -233,14 +247,13 @@ class classifier_agent():
         # You may first call score_function
         # loss = nn.CrossEntropyLoss()(outputs, labels)
         prob_y_predict = self.score_function(X)
-        
         loss_arr = -1 * (y * np.log(prob_y_predict) + ((1-y) * np.log(1-prob_y_predict)))
         overall_loss_scalar = np.sum(loss_arr) * (1/y.shape[0])
 
         loss =  0.0
         
         loss = overall_loss_scalar
-        print('Loss over')
+        # print('Loss over')
 
         # TODO =============================================================================
 
@@ -258,8 +271,16 @@ class classifier_agent():
         # Hint 1:  Use the score_function first
         # Hint 2:  vectorized operations will be orders of magnitudely faster than a for loop
         # Hint 3:  don't make X a dense matrix
+        
+        
+        
 
         grad = np.zeros_like(self.params)
+        prediction = self.score_function(X)
+        difference = prediction - y
+        grad =  X * difference
+        
+        
 
         # TODO =============================================================================
         return grad
@@ -280,13 +301,18 @@ class classifier_agent():
         print('training gd')
 
         Xtrain = self.batch_feat_map(train_sentences)
-        print(Xtrain,'FDJKFKDJFHK')
         ytrain = np.array(train_labels)
         train_losses = [self.loss_function(Xtrain, ytrain)]
         train_errors = [self.error(Xtrain, ytrain)]
         # TODO ======================== YOUR CODE HERE =====================================
         # You need to iteratively update self.params
+        for i in range(niter):
+            gradient = self.gradient(Xtrain, ytrain)
+            # print(gradient.shape)
+            self.params = self.params - lr*gradient
+            
         # TODO =============================================================================
+        print('end gd')
         return train_losses, train_errors
 
 
@@ -315,9 +341,12 @@ class classifier_agent():
         # You should use the following for selecting the index of one random data point.
 
         idx = np.random.choice(len(ytrain), 1)
-
+        gradient = self.gradient(Xtrain[:,idx[0]], ytrain[idx])
+        self.params = self.params - lr*gradient
+            
         # TODO =============================================================================
         return train_losses, train_errors
+    
 
 
     def eval_model(self, test_sentences, test_labels):
@@ -378,6 +407,7 @@ def compute_word_idf(train_sentences,vocab):
     # TODO ======================== YOUR CODE HERE =====================================
     # The first step is to use the tokenize function to process each sentence into list of words.
     # Then you may loop through each word of each document (sentence)
+    
 
     # notice that this is a one-off pre-processing for the tf-idf feature.
     # TODO =============================================================================
