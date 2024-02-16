@@ -8,6 +8,7 @@ nlp = spacy.load('en_core_web_sm')
 
 from nltk.corpus import stopwords, words
 from nltk.stem import PorterStemmer
+import time
 
 porter_stemmer = PorterStemmer()
 
@@ -30,9 +31,13 @@ def main():
     sentences_pos = load_data("data/training_pos.txt")
     sentences_neg = load_data("data/training_neg.txt")
 
-    train_sentences = sentences_pos[:3000] + sentences_neg[:3000]
+    # train_sentences = sentences_pos[:3000] + sentences_neg[:3000]
+    train_sentences = sentences_pos + sentences_neg
+    
 
-    train_labels = [1 for i in range(len(sentences_pos[:3000]))] + [0 for i in range(len(sentences_neg[:3000]))]
+    # train_labels = [1 for i in range(len(sentences_pos[:3000]))] + [0 for i in range(len(sentences_neg[:3000]))]
+    train_labels = [1 for i in range(len(sentences_pos))] + [0 for i in range(len(sentences_neg))]
+    
 
     sentences_pos = load_data("data/test_pos_public.txt")
     sentences_neg = load_data("data/test_neg_public.txt")
@@ -55,6 +60,7 @@ def main():
     # feat_map = feature_extractor(vocab_list, tokenize)
     feat_map = feature_extractor(formatted_vocab_list, tokenize)
     
+    
     print('after feature extractor')
     
     print('feature map', feat_map)
@@ -64,19 +70,20 @@ def main():
     # feat_map = tfidf_extractor(vocab_list, tokenize, word_freq)
 
     # train with GD
-    niter = 100
+    niter = 1000
     print("Training using GD for ", niter, "iterations.")
     # d = len(vocab_list)
     d = len(formatted_vocab_list)
     params = np.array([0.0 for i in range(d)])
     classifier1 = classifier_agent(feat_map,params)
+    # classifier1.load_params_from_file('sgd_wts_bow.npy')
     classifier1.train_gd(train_sentences,train_labels,niter,0.01)
 
 
 
 
     # train with SGD
-    nepoch = 10
+    nepoch = 50
     print("Training using SGD for ", nepoch, "data passes.")
     # d = len(vocab_list)
     d = len(formatted_vocab_list)
@@ -91,6 +98,12 @@ def main():
     print('GD: test err = ', err1,
           'SGD: test err = ', err2)
     print('SGD: test err = ', err2)
+    
+    classifier1.save_params_to_file('gd_wts_bow.npy')
+    classifier2.save_params_to_file('sgd_wts_bow.npy')
+    classifier1.save_params_to_file('gd_wts_bow.txt')
+    classifier2.save_params_to_file('sgd_wts_bow.txt')
+    
 
 
 if __name__ == "__main__":

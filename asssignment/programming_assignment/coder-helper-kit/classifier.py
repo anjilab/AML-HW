@@ -44,12 +44,14 @@ class feature_extractor:
         self.d = len(vocab)
 
     def bag_of_word_feature(self, sentence):
-        # print(len(sentence))
         '''
         Bag of word feature extactor
         :param sentence: A text string representing one "movie review"
         :return: The feature vector in the form of a "sparse.csc_array" with shape = (d,1)
         '''
+        
+        
+
         # print('actual function=========================')
         # print(sentence)
         # print(self.vocab_dict)
@@ -81,14 +83,50 @@ class feature_extractor:
         # Hint 3:  Python's standard library: Collections.Counter might be useful
 
         # x = 0
+        
+        tokenize_one_review = tokenize(sentence)
+        word_counts = Counter(tokenize_one_review)
+        row_ind = []
+        col_ind = []
+        data = []
+        x = csc_matrix((self.d, 1), dtype=np.int8)
+        for word, count in word_counts.items():
+            if word in self.vocab_dict:
+                row_ind.append(0)
+                col_ind.append(self.vocab_dict[word])
+                data.append(count)
+
+        x = csc_matrix((data, (row_ind, col_ind)), shape=(1, self.d))
+
+        return x
+    
         # TODO =============================================================================
         # x = np.zeros((self.d))
         x = csc_matrix((self.d, 1), dtype=np.int8)
         x = x.tolil()
         tokenize_one_review = tokenize(sentence)
-        for word in tokenize_one_review:
+        # for word in tokenize_one_review:
+        #     if word in self.vocab_dict:
+        #         x[self.vocab_dict[word]] = Counter([sentence])[word]
+                
+        word_counts = Counter(tokenize_one_review)
+        
+        
+        for word, count in word_counts.items():
             if word in self.vocab_dict:
-                x[self.vocab_dict[word],0] = Counter([sentence])[word]
+                x[self.vocab_dict[word], 0] = count
+                
+                
+
+       
+                
+
+        return x
+    
+    
+                
+        
+        
                 
             
         
@@ -103,8 +141,13 @@ class feature_extractor:
         #             x[self.vocab_dict[unique_word],0] += 1
         #         else:  
         #             x[self.vocab_dict[unique_word],0] = 1
+        
+        
+        
+        
                     
         return x.tocsr()
+
 
 
     def __call__(self, sentence):
@@ -133,8 +176,7 @@ class classifier_agent():
         print(self.feat_map,'constructor of classifier agent')
 
     def batch_feat_map(self, sentences):
-        print('sentences', len(sentences), isinstance(sentences, list))
-        print(self.feat_map, 'dfakhfkjdhsfl')
+
         '''
         This function processes data according to your feat_map. Please do not modify.
 
@@ -143,20 +185,16 @@ class classifier_agent():
         '''
         try:
             if isinstance(sentences, list):
-                start = time.time()
-                X = scipy.sparse.hstack([self.feat_map(sentence) for sentence in sentences])
-                end = time.time()
-                print(end - start)
+                X = scipy.sparse.vstack([self.feat_map(sentence) for sentence in sentences])
             else:
                 X = self.feat_map(sentences)
                 
-            print('BATCH FEATURE MAP COMPLETE')
             return X
         except Exception:
             print('error')
 
     def score_function(self, X):
-        print('inside score function')
+        print('inside score function', type(X), X.shape, self.params.shape)
         '''
         This function computes the score function of the classifier.
         Note that the score function is linear in X
@@ -170,11 +208,10 @@ class classifier_agent():
         # exponents = np.exp(np.dot(self.params.T,X))
         # s = exponents / (1 + exponents)
         # print(self.params.shape, X.shape, 'score function')
-        s = self.params * X
-        # s = 1/np.exp(-s)
-        s = np.exp(s)/(1+np.exp(-s))
+        s = X * self.params
+        s = np.exp(s)/(1+np.exp(s))
+        # print( np.dot(self.params, X), 'just testinv')
         
-        print('end score')
 
         # TODO =============================================================================
         return s
@@ -195,7 +232,7 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # This should be a simple but useful function.
         preds = np.zeros(shape=X.shape[1])
-        preds = self.params * X
+        preds = X * self.params
         preds = 1/(1 + np.exp(-preds)) 
         
         # TODO =============================================================================
@@ -232,7 +269,6 @@ class classifier_agent():
 
 
     def loss_function(self, X, y):
-        print('Inside loss function')
         '''
         This function implements the logistic loss at the current self.params
 
@@ -278,7 +314,7 @@ class classifier_agent():
         grad = np.zeros_like(self.params)
         prediction = self.score_function(X)
         difference = prediction - y
-        grad =  X * difference
+        grad =  (1/y.shape[0]) * (difference * X)
         
         
 
@@ -336,12 +372,13 @@ class classifier_agent():
         ytrain = np.array(train_labels)
         train_losses = [self.loss_function(Xtrain, ytrain)]
         train_errors = [self.error(Xtrain, ytrain)]
+        print('INSIDE SGD,', Xtrain.shape)
         # TODO ======================== YOUR CODE HERE =====================================
         # You need to iteratively update self.params
         # You should use the following for selecting the index of one random data point.
 
         idx = np.random.choice(len(ytrain), 1)
-        gradient = self.gradient(Xtrain[:,idx[0]], ytrain[idx])
+        gradient = self.gradient(Xtrain[idx[0],:], ytrain[idx])
         self.params = self.params - lr*gradient
             
         # TODO =============================================================================
@@ -357,7 +394,7 @@ class classifier_agent():
         :param train_labels: Training data, a list of labels 0 or 1
         :return: error rate on the input dataset
         '''
-        X = scipy.sparse.hstack([self.feat_map(sentence) for sentence in test_sentences])
+        X = scipy.sparse.vstack([self.feat_map(sentence) for sentence in test_sentences])
         y = np.array(test_labels)
         return self.error(X, y)
 
