@@ -7,6 +7,9 @@ from collections import Counter
 import string
 from scipy.sparse import csc_matrix, issparse
 import time
+from torch import nn
+import torch
+import matplotlib.pyplot as plt
 
 # utility functions we provides
 
@@ -20,6 +23,21 @@ def load_data(file_name):
     with open(file_name, "r") as file:
         sentences = file.readlines()
     return sentences
+
+def plot(err, epoch,type):
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(epoch), err, marker='o', linestyle='-', color='b', label='Error vs Epoch')
+
+            # Adding labels and title
+    plt.xlabel('Epoch')
+    plt.ylabel('Error')
+    plt.title('Error vs Epoch')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f'{type} - Error vs Epoch')
+
+    plt.show()
+    
 
 
 def tokenize(sentence):
@@ -44,32 +62,12 @@ class feature_extractor:
         self.d = len(vocab)
 
     def bag_of_word_feature(self, sentence):
-        # print(len(sentence))
+        # print('Inside bow function')
         '''
         Bag of word feature extactor
         :param sentence: A text string representing one "movie review"
         :return: The feature vector in the form of a "sparse.csc_array" with shape = (d,1)
         '''
-        # print('actual function=========================')
-        # print(sentence)
-        # print(self.vocab_dict)
-        # arr = []
-        # arr.append(sentence)
-        # sentence_embedding = np.zeros((self.d))
-        # sentence_embedding = csc_matrix((self.d, 1), dtype=np.int8).toarray()
-        
-        
-        # for unique_word in self.vocab_dict:
-        #     if unique_word in sentence:
-        #         sentence_embedding[self.vocab_dict[unique_word], 0] = 1
-                
-        # arr = {}
-        # for word in self.tokenize(sentence):
-        #     if worcd in arr:
-        #         arr[word] += arr[word]
-        #     else:
-        #         arr[word] = 1
-        # print(arr)
         
 
         # TODO ======================== YOUR CODE HERE =====================================
@@ -81,34 +79,29 @@ class feature_extractor:
         # Hint 3:  Python's standard library: Collections.Counter might be useful
 
         # x = 0
-        # TODO =============================================================================
-        # x = np.zeros((self.d))
-        x = csc_matrix((self.d, 1), dtype=np.int8)
-        x = x.tolil()
+        
         tokenize_one_review = tokenize(sentence)
-        for word in tokenize_one_review:
+        word_counts = Counter(tokenize_one_review)
+        # row_ind,col_ind, data = []
+        row_ind = []
+        col_ind = []
+        data = []
+        # x = csc_matrix((self.d, 1), dtype=np.int8)
+        for word, count in word_counts.items():
             if word in self.vocab_dict:
-                x[self.vocab_dict[word],0] = Counter([sentence])[word]
+                row_ind.append(self.vocab_dict[word])
+                col_ind.append(0)
+                data.append(count)
+
+        x = csc_matrix((data, (row_ind, col_ind)), shape=(self.d,1))
+
+        return x
+    
+        # TODO =============================================================================
                 
-            
-        
-        
-
-                    
-        # for unique_word in self.vocab_dict:
-        #     if unique_word in sentence:
-        #         # print(x[self.vocab_dict[unique_word],0],'fdkfjdfjk')
-        #         # this below if was i was trying to increase the count in the same sentence repeated words
-        #         if x[self.vocab_dict[unique_word],0] and x[self.vocab_dict[unique_word],0] == 1:
-        #             x[self.vocab_dict[unique_word],0] += 1
-        #         else:  
-        #             x[self.vocab_dict[unique_word],0] = 1
-                    
-        return x.tocsr()
-
+                
 
     def __call__(self, sentence):
-        # print('Callavble',sentence)
         # This function makes this any instance of this python class a callable object
         return self.bag_of_word_feature(sentence)
 
@@ -130,11 +123,8 @@ class classifier_agent():
         '''
         self.feat_map = feat_map
         self.params = np.array(params)
-        print(self.feat_map,'constructor of classifier agent')
 
     def batch_feat_map(self, sentences):
-        print('sentences', len(sentences), isinstance(sentences, list))
-        print(self.feat_map, 'dfakhfkjdhsfl')
         '''
         This function processes data according to your feat_map. Please do not modify.
 
@@ -143,20 +133,15 @@ class classifier_agent():
         '''
         try:
             if isinstance(sentences, list):
-                start = time.time()
                 X = scipy.sparse.hstack([self.feat_map(sentence) for sentence in sentences])
-                end = time.time()
-                print(end - start)
             else:
                 X = self.feat_map(sentences)
                 
-            print('BATCH FEATURE MAP COMPLETE')
             return X
-        except Exception:
-            print('error')
+        except Exception as e:
+            print(f'Error in batch_feat_map: {e}')
 
     def score_function(self, X):
-        print('inside score function')
         '''
         This function computes the score function of the classifier.
         Note that the score function is linear in X
@@ -166,15 +151,8 @@ class classifier_agent():
 
         (d,m) = X.shape
         s = np.zeros(shape=m) # this is the desired type and shape for the output
-        # TODO ======================== YOUR CODE HERE =====================================
-        # exponents = np.exp(np.dot(self.params.T,X))
-        # s = exponents / (1 + exponents)
-        # print(self.params.shape, X.shape, 'score function')
-        s = self.params * X
-        # s = 1/np.exp(-s)
-        s = np.exp(s)/(1+np.exp(-s))
-        
-        print('end score')
+        s = X.T.dot(self.params).flatten()
+        s = 1 / (1 + np.exp(-s))
 
         # TODO =============================================================================
         return s
@@ -195,8 +173,11 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # This should be a simple but useful function.
         preds = np.zeros(shape=X.shape[1])
-        preds = self.params * X
-        preds = 1/(1 + np.exp(-preds)) 
+        preds = X.T.dot(self.params).flatten()
+        preds = np.exp(preds)/(1 + np.exp(preds))
+        predictions = (preds > 0.5).astype(int)
+        return predictions
+         
         
         # TODO =============================================================================
 
@@ -218,21 +199,14 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # The function should work for any integer m > 0.
         # You may wish to use self.predict
-        prob_y_predict =self.predict(X)
-        loss_arr = -1 * (y * np.log(prob_y_predict) + ((1-y) * np.log(1-prob_y_predict)))
-        overall_loss_scalar = np.sum(loss_arr) * (1/y.shape[0])
-        
-        
-        err =  0.0
-        
-        err = overall_loss_scalar
+        prediction = self.predict(X)
+        err = np.mean(prediction != y)
         # TODO =============================================================================
 
         return err
 
 
     def loss_function(self, X, y):
-        print('Inside loss function')
         '''
         This function implements the logistic loss at the current self.params
 
@@ -245,15 +219,10 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # The function should work for any integer m > 0.
         # You may first call score_function
-        # loss = nn.CrossEntropyLoss()(outputs, labels)
         prob_y_predict = self.score_function(X)
-        loss_arr = -1 * (y * np.log(prob_y_predict) + ((1-y) * np.log(1-prob_y_predict)))
-        overall_loss_scalar = np.sum(loss_arr) * (1/y.shape[0])
-
-        loss =  0.0
-        
+        loss_arr = -y * np.log(prob_y_predict) - (1 - y) * np.log(1 - prob_y_predict)
+        overall_loss_scalar = np.mean(loss_arr)
         loss = overall_loss_scalar
-        # print('Loss over')
 
         # TODO =============================================================================
 
@@ -273,20 +242,16 @@ class classifier_agent():
         # Hint 3:  don't make X a dense matrix
         
         
-        
 
         grad = np.zeros_like(self.params)
         prediction = self.score_function(X)
         difference = prediction - y
-        grad =  X * difference
-        
-        
-
+        grad =  (1/y.shape[0]) * X*difference
         # TODO =============================================================================
         return grad
 
 
-    def train_gd(self, train_sentences, train_labels, niter, lr=0.01):
+    def train_gd(self, train_sentences, train_labels, niter, lr=0.001):
         '''
         The function should updates the parameters of the model for niter iterations using Gradient Descent
         It returns the sequence of loss functions and the sequence of training error for each iteration.
@@ -298,21 +263,28 @@ class classifier_agent():
         :return: A list of loss values, and a list of training errors.
                 (Both of them has length niter + 1)
         '''
-        print('training gd')
 
         Xtrain = self.batch_feat_map(train_sentences)
         ytrain = np.array(train_labels)
         train_losses = [self.loss_function(Xtrain, ytrain)]
         train_errors = [self.error(Xtrain, ytrain)]
+        loss_arr = []
         # TODO ======================== YOUR CODE HERE =====================================
         # You need to iteratively update self.params
+        start = time.time()
         for i in range(niter):
             gradient = self.gradient(Xtrain, ytrain)
-            # print(gradient.shape)
             self.params = self.params - lr*gradient
             
+            loss = self.loss_function(Xtrain, ytrain)
+            error = self.error(Xtrain, ytrain)
+            train_losses.append(loss)
+            train_errors.append(error)
+            
+        end = time.time() 
+        print('Time elapsed',end-start)
         # TODO =============================================================================
-        print('end gd')
+        plot(train_errors, epoch=niter+1, type='GD')
         return train_losses, train_errors
 
 
@@ -339,12 +311,29 @@ class classifier_agent():
         # TODO ======================== YOUR CODE HERE =====================================
         # You need to iteratively update self.params
         # You should use the following for selecting the index of one random data point.
+        start = time.time()
+        for epoch in range(nepoch):
+            for i in range(len(ytrain)):
+                idx = np.random.choice(len(ytrain), 1)
+                gradient = self.gradient(Xtrain[:, idx[0]], ytrain[idx])
+                self.params = self.params - lr * gradient
+                
+    
+        
+            loss = self.loss_function(Xtrain, ytrain)
+            error = self.error(Xtrain, ytrain)
+            train_losses.append(loss)
+            train_errors.append(error)
+            
+        end = time.time() 
+        print('Time elapsed',end-start)
+            
 
-        idx = np.random.choice(len(ytrain), 1)
-        gradient = self.gradient(Xtrain[:,idx[0]], ytrain[idx])
-        self.params = self.params - lr*gradient
+        
             
         # TODO =============================================================================
+        plot(train_errors, epoch=nepoch+1,type='SGD')
+        
         return train_losses, train_errors
     
 
@@ -364,12 +353,18 @@ class classifier_agent():
     def save_params_to_file(self, filename):
         # The filename should be *.npy
         with open(filename, 'wb') as f:
+            
             np.save(f, self.params)
 
     def load_params_from_file(self, filename):
         with open(filename, 'rb') as f:
             self.params = np.load(f)
+            
+    def save_output_to_file(self, filename):
+         with open(filename, 'wb') as f:
+            np.save(f, self.params)
 
+        
 
 
 class tfidf_extractor(feature_extractor):

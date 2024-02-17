@@ -1,0 +1,4 @@
+GD: test err = 0.3433333333333333
+SGD: test err = 0.17466666666666666
+GD with idf: test err = 0.23366666666666666
+SGD with idf : test err = 0.23366666666666666

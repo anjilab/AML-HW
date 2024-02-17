@@ -258,6 +258,7 @@ class classifier_agent():
 
     def save_params_to_file(self, filename):
         # The filename should be *.npy
+        print('====self.params==', self.params)
         with open(filename, 'wb') as f:
             np.save(f, self.params)
 
